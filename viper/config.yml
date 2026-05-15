@@ -1,0 +1,7 @@
+database_url: postgres://crawler:password@localhost:5432/crawler
+index_url: http://localhost:9200/
+max_num_goroutine: 14
+shares:
+  "\\\\pdczsn0010.digi.intern\\Evidence": "/pdczsn0010.digi.intern/evidence"
+  "\\\\pdczsn0010.digi.intern\\Export": "/pdczsn0010.digi.intern/export"
+  "\\\\pdczsn0010.digi.intern\\Report": "/pdczsn0010.digi.intern/report"
