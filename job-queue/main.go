@@ -23,14 +23,14 @@ func (q JobQueue) Swap(i, j int) {
 	q[j].index = j
 }
 
-func (q *JobQueue) Push(x interface{}) {
+func (q *JobQueue) Push(x any) {
 	n := len(*q)
 	item := x.(*Job)
 	item.index = n
 	*q = append(*q, item)
 }
 
-func (q *JobQueue) Pop() interface{} {
+func (q *JobQueue) Pop() any {
 	old := *q
 	n := len(old)
 	item := old[n-1]

@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"time"
 )
 
@@ -27,7 +27,7 @@ func main() {
 		sem <- token{}
 		go func(task int) {
 			fmt.Printf("executing task %v\n", task)
-			time.Sleep(time.Duration(rand.Int63n(2)) * time.Second)
+			time.Sleep(time.Duration(rand.IntN(2)) * time.Second)
 			<- sem
 		}(task)
 	}

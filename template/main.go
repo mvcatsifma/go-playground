@@ -35,7 +35,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	data := make(map[string]interface{})
+	data := make(map[string]any)
 	data["CaseDescription"] = "zaak omschrijving"
 	data["VikCaseNumber"] = "vik zaak nummer"
 	data["Share"] = `\\\\pdczsn0010.digi.intern\\Evidence`
