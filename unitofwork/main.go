@@ -47,6 +47,7 @@ type DomainObject interface {
 	GetID() string
 }
 
+// doHelper is embedded in domain objects to give them access to the UnitOfWork via context.
 type doHelper struct {
 }
 
@@ -64,14 +65,14 @@ func (d *doHelper) markDirty(ctx context.Context, o DomainObject) {
 
 const ctxKeyUnitOfWork = "unitOfWork"
 
-// NewUnitOfWork creates a new UnitOfWork and adds it to the context. This method would DomainObjectßypically
-// be invoked in an HTTP filter.
+// NewUnitOfWork creates a UnitOfWork and stores it in the context; typically called in an HTTP filter.
 func NewUnitOfWork(ctx context.Context) (context.Context, *UnitOfWork) {
 	uow := &UnitOfWork{}
 	ctx = context.WithValue(ctx, ctxKeyUnitOfWork, uow)
 	return ctx, uow
 }
 
+// GetCurrentUnitOfWork retrieves the active UnitOfWork from the context; panics if none was set.
 func GetCurrentUnitOfWork(ctx context.Context) *UnitOfWork {
 	return ctx.Value(ctxKeyUnitOfWork).(*UnitOfWork)
 }

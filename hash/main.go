@@ -5,6 +5,7 @@ import (
 	"log"
 )
 
+// Hashes two file paths with SHA-256 to show how similar inputs produce distinct digests.
 func main() {
 	const (
 		input1 = "/foo/bar/baz/bax.txt"

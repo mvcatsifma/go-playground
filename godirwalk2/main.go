@@ -24,9 +24,10 @@ func main() {
 			result.Visited++
 			return nil
 		},
+		// ErrFatal stops the entire walk; all other errors skip the offending node.
 		ErrorCallback: func(path string, err error) godirwalk.ErrorAction {
 			if errors.Is(ErrFatal, err) {
-				return godirwalk.Halt // halts the walk process and returns err
+				return godirwalk.Halt
 			}
 			return godirwalk.SkipNode
 		},

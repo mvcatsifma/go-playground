@@ -53,6 +53,7 @@ func SumFloats(m map[string]float64) float64 {
 	return s
 }
 
+// SumIntsOrFloats works for any map whose value is int64 or float64; type params can be inferred.
 func SumIntsOrFloats[K comparable, V int64 | float64](m map[K]V) V {
 	var s V
 	for _, v := range m {
@@ -61,6 +62,7 @@ func SumIntsOrFloats[K comparable, V int64 | float64](m map[K]V) V {
 	return s
 }
 
+// SumNumbers uses the named Number constraint instead of an inline union.
 func SumNumbers[K comparable, V Number](m map[K]V) V {
 	var s V
 	for _, v := range m {

@@ -6,6 +6,7 @@ import (
 	"log"
 )
 
+// Loads config.yml, applies a default, and auto-reads env vars prefixed with CRAWLER_.
 func main() {
 	viper.AddConfigPath(".")
 	viper.SetDefault("max_num_goroutine", 16)

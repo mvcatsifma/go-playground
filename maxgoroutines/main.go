@@ -17,6 +17,8 @@ func init() {
 	runtime.GOMAXPROCS(cpus)
 }
 
+// Spawns one worker goroutine per CPU; each drains itemChan until it is closed.
+// SIGINT stops the producer and closes the channel, triggering a clean shutdown via WaitGroup.
 func main() {
 	itemChan := make(chan int)
 

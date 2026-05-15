@@ -16,6 +16,8 @@ func init() {
 	}
 }
 
+// sem is a counting semaphore: acquiring a slot blocks when limit goroutines are already running.
+// Draining the semaphore at the end waits for all in-flight goroutines without a WaitGroup.
 func main() {
 	const limit = 2
 	sem := make(chan token, limit)

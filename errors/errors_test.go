@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// NError wraps another error and implements Unwrap so errors.Is/As can traverse the chain.
 var XError = errors.New("xerror")
 
 type NError struct {

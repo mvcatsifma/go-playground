@@ -20,6 +20,7 @@ type httpResp interface {
 	a | b
 }
 
+// unmarshaller is a type-parameterized function that decodes a response body into T.
 type unmarshaller[T httpResp] func(closer io.ReadCloser) (T, error)
 
 func main() {
@@ -64,6 +65,7 @@ func main() {
 	log.Printf("%+v\n", resB)
 }
 
+// handleResponse dispatches on status code and delegates body decoding to the caller-supplied unmarshaller.
 func handleResponse[T httpResp](resp http.Response, u unmarshaller[T]) (T, error) {
 	var r T
 	if resp.StatusCode == http.StatusOK {

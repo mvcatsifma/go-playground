@@ -21,13 +21,14 @@ func main() {
 		signal.Stop(signalChan)
 		cancel()
 	}()
+	// First SIGINT cancels the context for a graceful shutdown; second does a hard exit.
 	go func() {
 		select {
-		case <-signalChan: // first signal, cancel context
+		case <-signalChan:
 			cancel()
 		case <-ctx.Done():
 		}
-		<-signalChan // second signal, hard exit
+		<-signalChan
 		os.Exit(exitCodeInterrupt)
 	}()
 	if err := run(ctx, os.Args); err != nil {
@@ -36,6 +37,7 @@ func main() {
 	}
 }
 
+// run is the main work loop; it exits cleanly when ctx is canceled.
 func run(ctx context.Context, args []string) error {
 	for {
 		select {

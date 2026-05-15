@@ -9,6 +9,7 @@ func main() {
 	_, _ = foo.Write([]byte("hello there"))
 }
 
+// HelloWriter adapts a plain function to the io.Writer interface.
 type HelloWriter func(str string)
 
 func (f HelloWriter) Write(p []byte) (int, error) {

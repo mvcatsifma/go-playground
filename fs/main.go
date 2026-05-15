@@ -16,7 +16,7 @@ func main() {
 	fmt.Printf("%s\n", string(data))
 }
 
-// StdFS implements fs.ReadFileFS, fs.
+// StdFS implements fs.ReadFileFS and fs.StatFS using the real OS filesystem.
 type StdFS struct {
 }
 

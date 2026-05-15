@@ -65,6 +65,8 @@ func main() {
 	fmt.Println("done")
 }
 
+// handleTask walks task.path, checking ctx on every entry so it stops promptly on timeout or cancel.
+// Permission and path errors are counted but do not halt the walk; TaskCanceled halts immediately.
 func handleTask(task *Task, fs Fs, ctx context.Context) *TaskResult {
 	log.Printf("task[%v]: handling now \n", task.id)
 

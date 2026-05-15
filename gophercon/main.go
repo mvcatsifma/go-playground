@@ -9,6 +9,7 @@ func main() {
 	c := make(chan string)
 	quit := make(chan struct{})
 
+	// Producer closes quit when all messages are sent; the select loop exits on that signal.
 	go func(messages []string) {
 		for _, s := range messages {
 			c <- s
