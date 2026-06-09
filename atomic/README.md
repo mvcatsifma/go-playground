@@ -12,7 +12,7 @@ Typed atomics: `atomic.Int64`, `atomic.Bool`, `atomic.Pointer[T]` (Go 1.19+).
 ## Todo
 
 - [x] Increment an `atomic.Int64` from 100 goroutines and verify the final value is exactly 100 — the canonical correctness test; run with `-race`.
-- [ ] Use `atomic.Bool` as a shutdown flag: set it from a signal handler, poll it in workers, verify clean exit.
+- [x] Use `atomic.Bool` as a shutdown flag: set it from a signal handler, poll it in workers, verify clean exit.
 - [ ] Store a `*Config` in `atomic.Pointer[Config]`; update it from one goroutine while readers `Load` and use it concurrently without a mutex — practice the read-copy-update pattern.
 - [ ] Implement lock-free stack `Push` with a CAS loop on `atomic.Pointer[node]`; test under concurrent pushes with `-race`.
 
