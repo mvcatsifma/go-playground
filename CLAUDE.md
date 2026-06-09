@@ -45,3 +45,12 @@ Notable experiments:
 ## Adding a new experiment
 
 Create a new directory with a `main.go` using `package main`. The module path is `dsen.nl/go-playground`, so sub-packages import as `dsen.nl/go-playground/<dir>/<subpkg>`.
+
+## Working with the user
+
+The user handles all code implementations manually. Claude should:
+- Explain concepts and answer questions
+- Review existing code
+- Suggest approaches and design patterns
+- Help with debugging and testing
+- **NOT** write or implement code unless explicitly requested
