@@ -2,6 +2,7 @@ package atomic
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
 	"sync"
@@ -11,6 +12,29 @@ import (
 
 type Config struct {
 	version int
+}
+
+// concurrentStackPush demonstrates the lock-free stack with concurrent pushes.
+// Spawns 20 goroutines that each push a random value. The CAS retry loop in Stack.Push
+// ensures no pushes are lost despite concurrent modifications. After all pushes complete,
+// pops and prints all values to verify the stack contains exactly 20 items.
+func concurrentStackPush() {
+	stack := &Stack{}
+
+	var wg sync.WaitGroup
+	// Spawn 20 goroutines that concurrently push random values
+	for i := 0; i < 20; i++ {
+		wg.Go(func() {
+			stack.Push(rand.Intn(99)) // Lock-free push - uses CAS retry loop
+		})
+	}
+	wg.Wait() // Wait for all pushes to complete
+
+	// Pop all values to verify the stack contains all 20 pushed items
+	for !stack.IsEmpty() {
+		_, val := stack.Pop()
+		fmt.Printf("Stack: Pop: value %d\n", val)
+	}
 }
 
 // updateAndReadConfig demonstrates the read-copy-update (RCU) pattern with atomic.Pointer.
@@ -42,7 +66,7 @@ func updateAndReadConfig() {
 	wg.Go(func() {
 		for !stop.Load() { // Poll until shutdown
 			time.Sleep(5 * time.Second)
-			old := ap.Load()    // Read current config
+			old := ap.Load() // Read current config
 			updated := &Config{ // Copy and modify (never mutate in-place)
 				version: old.version + 1,
 			}
