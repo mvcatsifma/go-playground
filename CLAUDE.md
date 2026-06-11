@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Go playground — a flat collection of self-contained experiments and learning exercises. Each top-level directory is an independent program (its own `package main`) or test package exploring a specific Go feature, pattern, or library.
 
+**Go version:** go1.26.0
+
 ## Commands
 
 ```bash
