@@ -19,12 +19,63 @@ var URLs = []string{
 	"https://www.iana.org/help/foobar", // Intentionally 404 to demonstrate error handling
 }
 
+// tryRunWithLimit demonstrates non-blocking work submission with errgroup.TryGo.
+// Unlike g.Go() which blocks when the limit is reached, TryGo() returns false immediately,
+// allowing the caller to handle rejections (retry, queue, drop, etc).
+func tryRunWithLimit() {
+	var g errgroup.Group
+	g.SetLimit(2) // Maximum 2 goroutines running concurrently
+
+	// Task 1: runs for 5 seconds - fills first slot
+	g.Go(func() error {
+		fmt.Println("Running Task 1")
+		select {
+		case <-time.After(5 * time.Second):
+			fmt.Println("Task 1 done")
+		}
+		return nil
+	})
+
+	// Task 2: runs for 10 seconds - fills second slot
+	// Both slots now occupied until Task 1 completes at t=5s
+	g.Go(func() error {
+		fmt.Println("Running Task 2")
+		select {
+		case <-time.After(10 * time.Second):
+			fmt.Println("Task 2 done")
+		}
+		return nil
+	})
+
+	// Task 3: Define once, submit with TryGo in retry loop
+	task3 := func() error {
+		fmt.Println("Running Task 3")
+		time.Sleep(2 * time.Second)
+		fmt.Println("Task 3 done")
+		return nil
+	}
+
+	// TryGo returns false when limit is reached (both slots occupied).
+	// Loop retries every second until a slot opens (when Task 1 completes at t=5s).
+	// This demonstrates non-blocking submission with explicit retry logic.
+	for !g.TryGo(task3) {
+		fmt.Println("Task 3 rejected - retrying in 1s...")
+		time.Sleep(1 * time.Second)
+	}
+	fmt.Println("Task 3 accepted")
+
+	// Wait for all tasks to complete
+	if err := g.Wait(); err != nil {
+		fmt.Println(err)
+	}
+}
+
 // runWithLimit demonstrates concurrency limiting with errgroup.SetLimit.
 // Spawns 50 goroutines but limits concurrent execution to 4 at a time.
 // Uses atomic counter to track active goroutines and verify the limit is respected.
 func runWithLimit() {
 	var counter atomic.Int32 // Tracks number of currently active goroutines
-	var id atomic.Int32       // Assigns unique ID to each goroutine
+	var id atomic.Int32      // Assigns unique ID to each goroutine
 	var g errgroup.Group
 	g.SetLimit(4) // Maximum 4 goroutines running concurrently
 
