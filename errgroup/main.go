@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -15,6 +17,54 @@ var URLs = []string{
 	"http://www.example.org",
 	"http://www.cnn.com",
 	"https://www.iana.org/help/foobar", // Intentionally 404 to demonstrate error handling
+}
+
+// runWithLimit demonstrates concurrency limiting with errgroup.SetLimit.
+// Spawns 50 goroutines but limits concurrent execution to 4 at a time.
+// Uses atomic counter to track active goroutines and verify the limit is respected.
+func runWithLimit() {
+	var counter atomic.Int32 // Tracks number of currently active goroutines
+	var id atomic.Int32       // Assigns unique ID to each goroutine
+	var g errgroup.Group
+	g.SetLimit(4) // Maximum 4 goroutines running concurrently
+
+	// Start monitoring goroutine that prints active count every second
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				// Counter should never exceed 4 due to SetLimit
+				fmt.Printf("counter: %d\n", counter.Load())
+			case <-done:
+				return // Stop monitoring when all work completes
+			}
+		}
+	}()
+
+	// Submit 50 tasks - SetLimit ensures only 4 run simultaneously, rest queue
+	for i := 0; i < 50; i++ {
+		g.Go(func() error {
+			// Assign unique ID and track start of work
+			cur := id.Add(1) // Atomic increment, returns new value (1-50)
+			fmt.Printf("goroutine %d\n", cur)
+
+			counter.Add(1)                                        // Increment active count
+			defer counter.Add(-1)                                 // Decrement when function exits
+			time.Sleep(time.Duration(rand.Intn(2)) * time.Second) // Simulate work (0-1 seconds)
+			return nil
+		})
+	}
+
+	// Wait for all 50 goroutines to complete
+	// SetLimit throttles execution, so this takes longer than without limit
+	if err := g.Wait(); err != nil {
+		fmt.Printf("error: %s", err)
+	}
+
+	close(done) // Stop the monitoring goroutine
 }
 
 // runWithContext demonstrates automatic context cancellation when one task fails.
