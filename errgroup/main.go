@@ -1,10 +1,12 @@
 package errgroup
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -13,6 +15,90 @@ var URLs = []string{
 	"http://www.example.org",
 	"http://www.cnn.com",
 	"https://www.iana.org/help/foobar", // Intentionally 404 to demonstrate error handling
+}
+
+// runWithContext demonstrates automatic context cancellation when one task fails.
+// When errgroup.WithContext is used, the first goroutine to return an error triggers
+// context cancellation, signaling other goroutines to stop. However, cancellation is
+// cooperative - goroutines must check ctx.Done() to observe it. g.Wait() always waits
+// for ALL goroutines to complete, even after cancellation.
+func runWithContext() {
+	type Result struct {
+		statusCode int
+	}
+	resultChan := make(chan Result, 3)
+
+	// WithContext creates a context that gets canceled when first error occurs
+	g, ctx := errgroup.WithContext(context.Background())
+
+	// Goroutine 1: simulates long-running work (5 seconds)
+	g.Go(func() error {
+		// Select races between completing work and observing cancellation.
+		// When goroutine 3 errors at 1 second, ctx.Done() becomes ready and this
+		// goroutine exits immediately without waiting the full 5 seconds.
+		select {
+		case <-time.After(5 * time.Second):
+			// Work completed normally - send result
+			resultChan <- Result{
+				statusCode: http.StatusOK,
+			}
+		case <-ctx.Done():
+			// Context canceled early - another goroutine errored
+			err := ctx.Err()
+			fmt.Printf("goroutine 1 - context canceled: %s\n", err)
+			return err
+		}
+		return nil
+	})
+
+	// Goroutine 2: simulates long-running work (5 seconds)
+	g.Go(func() error {
+		// Select races between completing work and observing cancellation.
+		// When goroutine 3 errors at 1 second, ctx.Done() becomes ready and this
+		// goroutine exits immediately without waiting the full 5 seconds.
+		select {
+		case <-time.After(5 * time.Second):
+			// Work completed normally - send result
+			resultChan <- Result{
+				statusCode: http.StatusOK,
+			}
+		case <-ctx.Done():
+			// Context canceled early - another goroutine errored
+			err := ctx.Err()
+			fmt.Printf("goroutine 2 - context canceled: %s\n", err)
+			return err
+		}
+		return nil
+	})
+
+	// Goroutine 3: errors early (1 second), triggering cancellation
+	g.Go(func() error {
+		select {
+		case <-time.After(1 * time.Second):
+			return fmt.Errorf("network error")
+		case <-ctx.Done():
+			// Context already canceled (unlikely in this scenario)
+			err := ctx.Err()
+			fmt.Printf("goroutine 3 - context canceled: %s\n", err)
+			return err
+		}
+	})
+
+	// Wait blocks until ALL three goroutines return, even though context is canceled.
+	// Returns first non-nil error (from goroutine 3).
+	// With context-aware select, goroutines 1 and 2 exit early (~1 second) when goroutine 3 errors.
+	// This demonstrates the "fail fast" pattern - one error cancels outstanding work immediately.
+	if err := g.Wait(); err != nil {
+		fmt.Printf("run: error: %s\n", err)
+	}
+
+	// Close channel after all goroutines complete
+	close(resultChan)
+
+	// Collect any results that were sent before cancellation
+	for result := range resultChan {
+		fmt.Printf("result: %v\n", result)
+	}
 }
 
 // fetchResults demonstrates collecting results from concurrent tasks with errgroup.
