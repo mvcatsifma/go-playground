@@ -2,114 +2,115 @@ package main
 
 import (
 	"context"
-	"dsen.nl/go-playground/timeout/system"
-	"fmt"
-	"github.com/karrick/godirwalk"
+	"errors"
+	fspkg "io/fs"
 	"log"
 	"os"
 	"os/signal"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const limit = 2
 
-// todo: should be able to detect difference between
-// process cancellation and timeout.
+// main demonstrates context-aware directory walking with concurrency limiting, OS signal handling,
+// and timeout detection. Uses errgroup.SetLimit to bound concurrent tasks and distinguishes
+// between user cancellation (SIGINT) and context timeout.
 func main() {
-	fs := system.NewAferoFs()
-	sem := make(chan Token, limit)
-	tasks := make(chan *Task, 1)
-	//tasks <- &Task{id: 1, path: "D:\\"}
-	tasks <- &Task{id: 1, path: "/mnt/d"}
-
-	osInterruptChannel := make(chan os.Signal, 1)
-	signal.Notify(osInterruptChannel, os.Interrupt)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 
-	go func() {
-		for task := range tasks {
-			sem <- Token{}
-			go func(task *Task) {
-				result := handleTask(task, fs, ctx)
-				fmt.Printf("task result: %+v\n", result)
-				<-sem
-			}(task)
-		}
-	}()
+	root := "/Users/tdelnoij/code/github.com/mvcatsifma/go-playground/timeout"
+	fs := os.DirFS(root)
 
-	// This read will block untill an OS signal (such as Ctrl-C) is received:
+	var g errgroup.Group
+	g.SetLimit(2) // Maximum 2 goroutines running concurrently
+
+	// Register signal handler to cancel context on Ctrl+C
+	osInterruptChannel := make(chan os.Signal, 1)
+	signal.Notify(osInterruptChannel, os.Interrupt)
 	go func() {
 	readInterruptLoop:
 		for {
 			select {
-			case sig := <-osInterruptChannel:
-				switch sig {
-				case os.Interrupt: // SIGINT received
-					log.Println("SIGINT received, shutting down")
-					close(tasks)
-					cancel()
-					break readInterruptLoop
-				default:
-					log.Printf("unknown signal received: %v", sig)
-				}
+			case <-osInterruptChannel:
+				log.Println("signal received, shutting down")
+				cancel()
+				break readInterruptLoop
 			}
 		}
 	}()
 
-	fmt.Println("all tasks started, wait for done or interrupt")
-	for n := limit; n > 0; n-- {
-		sem <- Token{}
+	// Define tasks to process concurrently (max 2 at a time due to SetLimit)
+	tasks := []*Task{
+		{id: 1, path: "testdata/level1/a"},
+		{id: 2, path: "testdata/level1/b"},
+		{id: 3, path: "testdata/level1/c"},
+	}
+	for _, task := range tasks {
+		g.Go(func() error {
+			result := handleTask(task, fs, ctx)
+			log.Printf("task[%d] result: canceled=%v timeout=%v visited=%d err=%s\n",
+				task.id, result.canceled, result.timeout, result.visited, result.err)
+			return nil
+		})
 	}
 
-	fmt.Println("done")
+	log.Println("all tasks started, waiting for completion or interrupt")
+
+	_ = g.Wait()
+
+	log.Println("all tasks complete, shutting down")
 }
 
-// handleTask walks task.path, checking ctx on every entry so it stops promptly on timeout or cancel.
-// Permission and path errors are counted but do not halt the walk; TaskCanceled halts immediately.
-func handleTask(task *Task, fs Fs, ctx context.Context) *TaskResult {
-	log.Printf("task[%v]: handling now \n", task.id)
+// handleTask walks task.path recursively using fs.WalkDir, checking ctx.Done() on every entry
+// to stop promptly on timeout or cancellation. Non-critical errors (permission, path) are logged
+// but don't halt the walk. Returns TaskResult with visit count and cancellation/timeout status.
+func handleTask(task *Task, fs fspkg.FS, ctx context.Context) *TaskResult {
+	log.Printf("task[%d]: handling now\n", task.id)
 
 	result := &TaskResult{taskId: task.id}
 
-	err := godirwalk.Walk(task.path, &godirwalk.Options{
-		Callback: func(path string, entry *godirwalk.Dirent) error {
-			select {
-			case <-ctx.Done():
-				return TaskCanceled
-			default:
-				fileInfo, err := fs.Stat(path)
-				if err != nil {
-					return err
-				}
-
-				log.Printf("%s %s\n", fileInfo.Mode(), path)
-				result.visited++
-				return nil
+	_ = fspkg.WalkDir(fs, task.path, func(path string, d fspkg.DirEntry, err error) error {
+		if err != nil {
+			if errors.Is(err, TaskCanceled) || errors.Is(err, TaskTimeout) {
+				result.err = err.Error()
+				return err // Halt walk on cancellation or timeout
 			}
-		},
-		ErrorCallback: func(s string, err error) godirwalk.ErrorAction {
-			if err == TaskCanceled {
+			// Log other errors but continue walking (keeps first error only)
+			log.Printf("ERROR: task[%d]: %s\n", task.id, err)
+			if result.err == "" {
+				result.err = err.Error()
+			}
+			return nil // Continue despite error
+		}
+
+		// Check context before processing each entry
+		select {
+		case <-ctx.Done():
+			err := ctx.Err()
+			if errors.Is(err, context.Canceled) {
 				result.canceled = true
-				return godirwalk.Halt
+				log.Printf("task[%d]: canceled by user interrupt\n", task.id)
+				return TaskCanceled
 			}
-			if _, ok := err.(*os.PathError); ok {
-				if os.IsPermission(err) {
-					result.permissionErrors++
-				}
-				result.pathErrors++
-			}
-			// if elastic error... todo
-			log.Printf("ERROR: task[%v]: %s\n", task.id, err)
-			return godirwalk.SkipNode
-		},
-		Unsorted: true,
-	})
-	if err != nil {
-		log.Printf("ERROR: task[%v]: %v\n", task.id, err)
-	}
 
-	log.Printf("task[%v]: handling complete \n", task.id)
+			result.timeout = true
+			log.Printf("task[%d]: timeout after 60 seconds\n", task.id)
+			return TaskTimeout
+		default:
+			// Process entry: get info and log visit
+			fileInfo, err := d.Info()
+			if err != nil {
+				return err
+			}
+			log.Printf("task[%d] visited: %s %s\n", task.id, fileInfo.Mode(), path)
+			result.visited++
+			return nil
+		}
+	})
+
+	log.Printf("task[%d]: handling complete\n", task.id)
 
 	return result
 }
