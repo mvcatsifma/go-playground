@@ -19,38 +19,40 @@ const limit = 2
 // between user cancellation (SIGINT) and context timeout.
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-
-	root := "/Users/tdelnoij/code/github.com/mvcatsifma/go-playground/timeout"
-	fs := os.DirFS(root)
-
-	var g errgroup.Group
-	g.SetLimit(2) // Maximum 2 goroutines running concurrently
+	defer cancel()
 
 	// Register signal handler to cancel context on Ctrl+C
 	osInterruptChannel := make(chan os.Signal, 1)
 	signal.Notify(osInterruptChannel, os.Interrupt)
 	go func() {
-	readInterruptLoop:
-		for {
-			select {
-			case <-osInterruptChannel:
-				log.Println("signal received, shutting down")
-				cancel()
-				break readInterruptLoop
-			}
-		}
+		<-osInterruptChannel
+		log.Println("signal received, shutting down")
+		cancel()
 	}()
 
-	// Define tasks to process concurrently (max 2 at a time due to SetLimit)
+	root := "/Users/tdelnoij/code/github.com/mvcatsifma/go-playground/timeout"
+	fs := os.DirFS(root)
+
 	tasks := []*Task{
 		{id: 1, path: "testdata/level1/a"},
 		{id: 2, path: "testdata/level1/b"},
 		{id: 3, path: "testdata/level1/c"},
 		{id: 4, path: "testdata/level1/restricted"},
 	}
+
+	runTasks(ctx, fs, tasks)
+}
+
+// runTasks processes tasks concurrently with context awareness and concurrency limiting.
+// Returns after all tasks complete or context is canceled/times out.
+func runTasks(ctx context.Context, fs fspkg.FS, tasks []*Task) {
+	var g errgroup.Group
+	g.SetLimit(limit) // Maximum 2 goroutines running concurrently
+
+	// Launch all tasks concurrently (respecting SetLimit)
 	for _, task := range tasks {
 		g.Go(func() error {
-			result := handleTask(task, fs, ctx)
+			result := runTask(ctx, fs, task)
 			log.Printf("task[%d] result: canceled=%v timeout=%v foundTarget=%v visited=%d err=%v\n",
 				task.id, result.canceled, result.timeout, result.foundTarget, result.visited, result.err)
 			return nil
@@ -58,16 +60,14 @@ func main() {
 	}
 
 	log.Println("all tasks started, waiting for completion or interrupt")
-
 	_ = g.Wait()
-
 	log.Println("all tasks complete, shutting down")
 }
 
-// handleTask walks task.path recursively using fs.WalkDir, checking ctx.Done() on every entry
+// runTask walks task.path recursively using fs.WalkDir, checking ctx.Done() on every entry
 // to stop promptly on timeout or cancellation. Non-critical errors (permission, path) are logged
 // but don't halt the walk. Returns TaskResult with visit count and cancellation/timeout status.
-func handleTask(task *Task, fs fspkg.FS, ctx context.Context) *TaskResult {
+func runTask(ctx context.Context, fs fspkg.FS, task *Task) *TaskResult {
 	log.Printf("task[%d]: handling now\n", task.id)
 
 	result := &TaskResult{taskId: task.id}
