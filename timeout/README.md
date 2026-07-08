@@ -8,6 +8,12 @@ Context-aware directory walking with errgroup concurrency limiting, OS signals, 
 `model.go` — `Task`, `TaskResult`, error sentinels (`TaskCanceled`, `TaskTimeout`).
 `testdata/` — test directory structure with nested files and restricted permissions.
 
+**Note:** To test permission error handling, remove read permissions from the restricted file:
+```bash
+chmod a-r testdata/level1/restricted/secret.txt
+```
+The file is committed with read permissions to avoid git issues, so permissions must be adjusted locally to surface "permission denied" errors.
+
 ## Todo
 
 - [ ] Use `testing/synctest` to test the timeout path without actually waiting 60 seconds.

@@ -46,12 +46,13 @@ func main() {
 		{id: 1, path: "testdata/level1/a"},
 		{id: 2, path: "testdata/level1/b"},
 		{id: 3, path: "testdata/level1/c"},
+		{id: 4, path: "testdata/level1/restricted"},
 	}
 	for _, task := range tasks {
 		g.Go(func() error {
 			result := handleTask(task, fs, ctx)
-			log.Printf("task[%d] result: canceled=%v timeout=%v visited=%d err=%s\n",
-				task.id, result.canceled, result.timeout, result.visited, result.err)
+			log.Printf("task[%d] result: canceled=%v timeout=%v foundTarget=%v visited=%d err=%v\n",
+				task.id, result.canceled, result.timeout, result.foundTarget, result.visited, result.err)
 			return nil
 		})
 	}
@@ -71,21 +72,31 @@ func handleTask(task *Task, fs fspkg.FS, ctx context.Context) *TaskResult {
 
 	result := &TaskResult{taskId: task.id}
 
-	_ = fspkg.WalkDir(fs, task.path, func(path string, d fspkg.DirEntry, err error) error {
-		if err != nil {
-			if errors.Is(err, TaskCanceled) || errors.Is(err, TaskTimeout) {
-				result.err = err.Error()
-				return err // Halt walk on cancellation or timeout
-			}
-			// Log other errors but continue walking (keeps first error only)
-			log.Printf("ERROR: task[%d]: %s\n", task.id, err)
-			if result.err == "" {
-				result.err = err.Error()
-			}
-			return nil // Continue despite error
+	err := fspkg.WalkDir(fs, task.path, func(path string, d fspkg.DirEntry, walkErr error) error {
+		// Handle errors from WalkDir (e.g., permission denied on directory read)
+		if walkErr != nil {
+			result.err = walkErr
+			log.Printf("ERROR: task[%d]: %s\n", task.id, walkErr)
+			return nil // Log error but continue walking
 		}
 
-		// Check context before processing each entry
+		// Skip "restricted" directories proactively before WalkDir attempts to read them.
+		// Demonstrates fs.SkipDir: skip this directory's contents but continue with siblings.
+		if d.IsDir() && d.Name() == "restricted" {
+			log.Printf("task[%d]: skipping restricted directory: %s\n", task.id, path)
+			return fspkg.SkipDir
+		}
+
+		// Search for sentinel file by name. When found, stop entire walk immediately.
+		// Demonstrates fs.SkipAll: terminate walk completely (successful early exit).
+		if !d.IsDir() && d.Name() == "sentinel-deadbeef-marker.txt" {
+			log.Printf("task[%d]: found sentinel file, stopping walk: %s\n", task.id, path)
+			result.visited++
+			result.foundTarget = true
+			return fspkg.SkipAll
+		}
+
+		// Check context before processing each entry (timeout or cancellation detection)
 		select {
 		case <-ctx.Done():
 			err := ctx.Err()
@@ -102,15 +113,20 @@ func handleTask(task *Task, fs fspkg.FS, ctx context.Context) *TaskResult {
 			// Process entry: get info and log visit
 			fileInfo, err := d.Info()
 			if err != nil {
-				return err
+				result.err = err
+				log.Printf("ERROR: task[%d]: %s\n", task.id, err)
+				return nil
 			}
+
 			log.Printf("task[%d] visited: %s %s\n", task.id, fileInfo.Mode(), path)
 			result.visited++
 			return nil
 		}
 	})
 
-	log.Printf("task[%d]: handling complete\n", task.id)
+	if err != nil {
+		result.err = err
+	}
 
 	return result
 }
