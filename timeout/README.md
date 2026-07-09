@@ -16,8 +16,8 @@ The file is committed with read permissions to avoid git issues, so permissions 
 
 ## Todo
 
-- [ ] Use `testing/synctest` to test the timeout path without actually waiting 60 seconds.
-- [ ] Write new tests using stdlib `fs` abstractions - use `testing/fstest.MapFS` for mocking instead of the deleted afero-based test doubles.
+- [x] Use `testing/synctest` to test the timeout path without actually waiting 60 seconds.
+- [x] Write new tests using stdlib `fs` abstractions - use `testing/fstest.MapFS` for mocking instead of the deleted afero-based test doubles.
 - [ ] Add test for restricted file handling - verify permission errors are handled correctly using `testdata/level1/restricted/secret.txt`.
 - [x] Distinguish timeout vs cancellation in `TaskResult`: added `canceled` and `timeout` bool fields, set based on `ctx.Err()`.
 - [x] Replace godirwalk with stdlib `fs.WalkDir`: simpler error handling, removed dependency on karrick/godirwalk.
