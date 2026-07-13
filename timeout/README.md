@@ -6,6 +6,7 @@ Context-aware directory walking with errgroup concurrency limiting, OS signals, 
 
 `main.go` — walks paths with stdlib `fs.WalkDir`, checks `ctx.Done()` every entry; `errgroup.SetLimit` caps concurrency at 2; SIGINT cancels; distinguishes timeout from cancellation.
 `model.go` — `Task`, `TaskResult`, error sentinels (`TaskCanceled`, `TaskTimeout`).
+`main_test.go` — comprehensive tests using `testing/synctest` for deterministic time control and `testing/fstest.MapFS` for filesystem mocking.
 `testdata/` — test directory structure with nested files and restricted permissions.
 
 **Note:** To test permission error handling, remove read permissions from the restricted file:
@@ -22,3 +23,9 @@ The file is committed with read permissions to avoid git issues, so permissions 
 - [x] Distinguish timeout vs cancellation in `TaskResult`: added `canceled` and `timeout` bool fields, set based on `ctx.Err()`.
 - [x] Replace godirwalk with stdlib `fs.WalkDir`: simpler error handling, removed dependency on karrick/godirwalk.
 - [x] Refactor semaphore to `errgroup.SetLimit`: replaced manual channel-based semaphore with errgroup for cleaner concurrency control.
+
+## Run
+
+```bash
+go test ./timeout/
+```
