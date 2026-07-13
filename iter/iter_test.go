@@ -1,10 +1,84 @@
 package iter
 
 import (
+	"cmp"
 	"iter"
+	"maps"
 	"slices"
 	"testing"
 )
+
+// TestSortedMap verifies that SortedMap yields map entries in sorted key order.
+// Maps in Go have non-deterministic iteration order, but SortedMap provides
+// deterministic iteration by sorting keys first. This demonstrates iter.Seq2[K, V]
+// for key-value pair iterators.
+func TestSortedMap(t *testing.T) {
+	m := map[string]int{
+		"z": 26,
+		"a": 1,
+		"m": 13,
+		"c": 3,
+	}
+
+	var keys []string
+	var values []int
+	for k, v := range SortedMap(m) {
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+
+	// Verify keys are in sorted order
+	expectedKeys := []string{"a", "c", "m", "z"}
+	if !slices.Equal(keys, expectedKeys) {
+		t.Errorf("keys: got %v, want %v", keys, expectedKeys)
+	}
+
+	// Verify values correspond to sorted keys
+	expectedValues := []int{1, 3, 13, 26}
+	if !slices.Equal(values, expectedValues) {
+		t.Errorf("values: got %v, want %v", values, expectedValues)
+	}
+}
+
+// TestSortedMapEarlyTermination verifies that SortedMap respects early termination
+// when the consumer breaks. This tests the yield contract: the iterator must check
+// yield's return value and stop immediately when it returns false. Without proper
+// early termination handling, the iterator could hang or leak resources.
+func TestSortedMapEarlyTermination(t *testing.T) {
+	m := map[string]int{
+		"z": 26,
+		"a": 1,
+		"m": 13,
+		"c": 3,
+	}
+
+	var keys []string
+	for k, _ := range SortedMap(m) {
+		keys = append(keys, k)
+		if len(keys) == 2 {
+			break // Stop after collecting 2 entries
+		}
+	}
+
+	// Should have collected exactly the first 2 sorted keys
+	expected := []string{"a", "c"}
+	if !slices.Equal(keys, expected) {
+		t.Errorf("got %v, want %v", keys, expected)
+	}
+}
+
+func SortedMap[K cmp.Ordered, V any](m map[K]V) iter.Seq2[K, V] {
+	keysSorted := slices.Collect(maps.Keys(m))
+	slices.Sort(keysSorted)
+
+	return func(yield func(K, V) bool) {
+		for _, k := range keysSorted {
+			if !yield(k, m[k]) {
+				return
+			}
+		}
+	}
+}
 
 // TestPull demonstrates iter.Pull which converts a push-style iterator (iter.Seq)
 // to a pull-style iterator where the consumer controls when to get the next value.
