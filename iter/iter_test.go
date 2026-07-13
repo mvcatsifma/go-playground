@@ -6,6 +6,61 @@ import (
 	"testing"
 )
 
+// TestFibonacci verifies that the Fibonacci iterator generates the correct sequence
+// and demonstrates early termination - the iterator is infinite but the consumer
+// stops after 10 values using break. This tests the yield contract: the iterator
+// must check yield's return value and stop immediately when it returns false.
+func TestFibonacci(t *testing.T) {
+	var result []int
+	count := 0
+	for v := range Fibonacci() {
+		if count == 10 {
+			break
+		}
+		result = append(result, v)
+		count++
+	}
+
+	// First 10 Fibonacci numbers: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34
+	expected := []int{0, 1, 1, 2, 3, 5, 8, 13, 21, 34}
+	if !slices.Equal(result, expected) {
+		t.Errorf("got %v, want %v", result, expected)
+	}
+}
+
+// Fibonacci returns an infinite iterator that yields the Fibonacci sequence: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34...
+// The iterator never terminates on its own - the consumer controls when to stop using break.
+// This demonstrates the iterator contract: always check yield's return value and stop when it returns false.
+func Fibonacci() iter.Seq[int] {
+	return func(yield func(int) bool) {
+		// Start with first two Fibonacci numbers
+		i := 0
+		j := 1
+
+		// Yield first value (0)
+		if !yield(i) {
+			return
+		}
+
+		// Yield second value (1)
+		if !yield(j) {
+			return
+		}
+
+		// Infinite loop: generate subsequent Fibonacci numbers
+		// Each number is the sum of the previous two
+		for {
+			curr := i + j
+			if !yield(curr) {
+				// Consumer called break, stop generating
+				return
+			}
+			// Shift window: previous becomes i, current becomes j
+			i, j = j, curr
+		}
+	}
+}
+
 // TestFilterMapChain verifies that Filter and Map can be chained together and that
 // the transformations are applied lazily - nothing happens until slices.Collect consumes
 // the iterator. This demonstrates the composability of iterator adapters.
