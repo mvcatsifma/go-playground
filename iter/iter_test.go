@@ -6,6 +6,38 @@ import (
 	"testing"
 )
 
+// TestPull demonstrates iter.Pull which converts a push-style iterator (iter.Seq)
+// to a pull-style iterator where the consumer controls when to get the next value.
+// This test takes exactly 3 values from a 10-element sequence, explicitly calls stop(),
+// and leaves the remaining 7 values unconsumed. Calling stop() is critical to prevent
+// goroutine leaks - iter.Pull spawns a goroutine that must be cleaned up.
+func TestPull(t *testing.T) {
+	in := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+
+	// iter.Pull converts push iterator to pull iterator
+	// Returns: next() to pull values, stop() to clean up the goroutine
+	next, stop := iter.Pull(slices.Values(in))
+
+	var result []int
+	// Pull exactly 3 values
+	for i := 0; i < 3; i++ {
+		v, ok := next()
+		if !ok {
+			t.Fatal("sequence ended prematurely")
+		}
+		result = append(result, v)
+	}
+
+	// Explicitly stop - remaining 7 values are not consumed
+	// This cleans up the goroutine spawned by iter.Pull
+	stop()
+
+	expected := []int{1, 2, 3}
+	if !slices.Equal(result, expected) {
+		t.Errorf("got %v, want %v", result, expected)
+	}
+}
+
 // TestFibonacci verifies that the Fibonacci iterator generates the correct sequence
 // and demonstrates early termination - the iterator is infinite but the consumer
 // stops after 10 values using break. This tests the yield contract: the iterator
