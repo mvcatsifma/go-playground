@@ -18,7 +18,7 @@
 - [x] Start a goroutine that sets a flag; call `synctest.Wait()` and assert the flag is set — verify you don't need `time.Sleep` to synchronise.
 - [x] Test a `context.WithTimeout` without real waiting: sleep to just before the deadline, assert no error; sleep past it, assert `DeadlineExceeded`.
 - [x] Test `context.AfterFunc`: verify the callback is not called before cancel and is called after — the example from the official docs, written from scratch.
-- [ ] Write a ticker-based rate limiter and test N ticks fire in order using fake time; confirm the test completes in microseconds.
+- [x] Write a ticker-based rate limiter and test N ticks fire in order using fake time; confirm the test completes in microseconds.
 - [ ] Test a retry-with-backoff function: advance fake time through multiple retry intervals and assert the correct number of attempts without real waiting.
 
 ## Run

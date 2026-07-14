@@ -5,7 +5,47 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
+
+// TestTicker demonstrates ticker-based rate limiting with synctest's fake time.
+// A ticker fires at regular intervals, throttling how often operations can execute.
+// This pattern ensures operations happen at most once per tick, regardless of how
+// fast they could otherwise run. With synctest, the test completes in microseconds
+// despite simulating 10 seconds of ticker behavior.
+func TestTicker(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		count := 0
+
+		// Ticker fires every 1 second (simulated time)
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
+		// Timeout after 10 seconds + small buffer to ensure 10th tick fires
+		timeout := time.After(10*time.Second + time.Millisecond)
+
+		// doWork represents any rate-limited operation
+		// In real code, this could be API calls, log writes, etc.
+		var doWork = func() {
+			count++
+		}
+
+	TickLoop:
+		for {
+			select {
+			case <-timeout:
+				break TickLoop
+			case <-ticker.C:
+				// Rate-limited: doWork() can only execute once per second
+				doWork()
+			}
+		}
+
+		// 10 ticks collected: 1 tick/second × 10 seconds
+		assert.Equal(t, 10, count)
+	})
+}
 
 // TestTime demonstrates synctest's controlled time advancement.
 // Time starts at midnight UTC 2000-01-01 and only advances when explicitly sleeping.
