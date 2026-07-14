@@ -3,11 +3,39 @@ package maps
 import (
 	"iter"
 	"maps"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// TestSortedKeys demonstrates collecting map keys into a sorted slice for
+// deterministic iteration. Maps have non-deterministic iteration order, but
+// by collecting keys with maps.Keys and sorting with slices.Sorted, you get
+// a deterministic, ordered slice that can be used to iterate over the map
+// in a predictable way. This is a common pattern for producing consistent
+// output or when order matters (e.g., config file generation, test stability).
+func TestSortedKeys(t *testing.T) {
+	m := make(map[string]bool)
+	m["z"] = true
+	m["a"] = true
+	m["b"] = true
+	m["c"] = true
+	m["d"] = true
+	m["e"] = true
+
+	// Collect keys and sort them: non-deterministic map → deterministic slice
+	sorted := slices.Sorted(maps.Keys(m))
+
+	// Verify ordering invariant: each key > previous
+	// Expected order from test data: a, b, c, d, e, z
+	prev := ""
+	for _, k := range sorted {
+		assert.True(t, k > prev)
+		prev = k
+	}
+}
 
 // TestMergeConfigs demonstrates using maps.Clone + maps.Copy to merge two maps
 // where the second map overrides the first on key conflicts. This is a common
