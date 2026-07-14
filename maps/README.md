@@ -40,7 +40,7 @@ for k, v := range m {
 
 - [x] Write `Invert[K, V comparable](m map[K]V) map[V]K` that swaps keys and values; handle collisions by keeping the last seen value.
 - [x] Use `maps.All` with an iterator adapter (e.g., your `Filter` from iter) to filter a map's entries, then collect with `maps.Collect` — demonstrates composing map operations with iterator pipelines.
-- [ ] Use `maps.DeleteFunc` to remove stale cache entries (e.g. entries where `value.ExpiresAt.Before(time.Now())`) — the most common real-world use of DeleteFunc.
+- [x] Use `maps.DeleteFunc` to remove entries that start with "f".
 - [ ] Use `maps.Clone` + `maps.Copy` to merge two configs where the second overrides the first; verify keys from both maps appear in the result.
 - [ ] Collect `maps.Keys` into a slice with `slices.Sorted`; iterate in deterministic order — build the habit of sorting map keys before ranging.
 

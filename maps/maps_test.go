@@ -9,6 +9,69 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestMergeConfigs demonstrates using maps.Clone + maps.Copy to merge two maps
+// where the second map overrides the first on key conflicts. This is a common
+// pattern for config merging: base config + override config = final config.
+//
+// maps.Clone creates a shallow copy, so the original maps remain unchanged.
+// maps.Copy(dst, src) copies all entries from src into dst, overwriting any
+// existing keys in dst.
+//
+// Pattern: merged := maps.Clone(base); maps.Copy(merged, override)
+func TestMergeConfigs(t *testing.T) {
+	// Base config (first)
+	cfg1 := make(map[string]int)
+	cfg1["foo"] = 1
+	cfg1["bar"] = 3
+
+	// Override config (second)
+	cfg2 := make(map[string]int)
+	cfg2["bar"] = 2 // Will override cfg1's bar=3
+	cfg2["baz"] = 4
+
+	// Clone cfg1, then copy cfg2 into it (cfg2 wins on conflicts)
+	merged := maps.Clone(cfg1)
+	maps.Copy(merged, cfg2)
+
+	// Result should have keys from both maps, with cfg2 overriding cfg1
+	expected := make(map[string]int)
+	expected["foo"] = 1 // from cfg1
+	expected["bar"] = 2 // from cfg2 (overrides cfg1's bar=3)
+	expected["baz"] = 4 // from cfg2
+
+	if !maps.Equal(merged, expected) {
+		t.Errorf("expected %v, got %v", expected, merged)
+	}
+}
+
+// TestDeleteFunc demonstrates maps.DeleteFunc which removes entries from a map
+// in-place based on a predicate. The predicate returns true to DELETE the entry
+// (opposite semantics from Filter's "keep" predicate).
+//
+// Key differences from Filter:
+// - maps.DeleteFunc: modifies original map in-place, no return value
+// - Filter: returns new map via maps.Collect, original unchanged
+//
+// Use DeleteFunc when you want to clean up an existing map without creating a copy.
+func TestDeleteFunc(t *testing.T) {
+	in := make(map[string]int)
+	in["foo"] = 1
+	in["bar"] = 2
+	in["baz"] = 3
+
+	// Delete entries where key starts with "f"
+	// Predicate returns true to DELETE (not keep)
+	maps.DeleteFunc(in, func(s string, i int) bool {
+		return strings.HasPrefix(s, "f")
+	})
+
+	// "foo" should be removed, "bar" and "baz" remain
+	assert.Len(t, in, 2)
+	assert.Contains(t, in, "bar")
+	assert.Contains(t, in, "baz")
+	assert.NotContains(t, in, "foo")
+}
+
 // TestFilterMapByKey demonstrates using maps.All with an iterator adapter (Filter)
 // to functionally filter a map's entries, then collect back to a map with maps.Collect.
 // This shows the value of maps.All: it converts a map to iter.Seq2[K, V] which can be
